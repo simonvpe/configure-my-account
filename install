@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+log=$(mktemp)
+
+# Handlers
+die() {
+    echo "Error: $1" >&2
+    echo "See logfile $log" >&2
+    exit 1
+}
+
+info_() {
+    echo "$1" >&2
+}
+
+info_ "Writing logfile $log"v
+
+# Checks
+[ -x /bin/zsh ] || die "Please install zsh"
+sudo -v &>/dev/null || die "Please make sure you have sudo"
+
+# Configure the shell to be zsh
+shell=$(getent passwd $LOGNAME |cut -d: -f7)
+if [[ "$shell" != "/bin/zsh" ]]; then
+    info_ "Configuring user shell to be zsh"
+    sudo usermod -s /bin/zsh $(id -un) &>>$log || die "Failed to set user shell"
+fi
+
+# Create a temp dir to work in
+tmp=$(mktemp -d)
+[[ "$?" == "0" ]] && cd "$tmp" || die "Failed to create temp directory"
+
+install_oh_my_zsh() {
+    info_ "Installing oh-my-zsh"
+    git clone http://github.com/simonvpe/oh-my-zsh &>>$log && cd oh-my-zsh &>>$log \
+	    || die "Failed to clone oh-my-zsh"
+
+    rm -rf ~/.zshrc ~/.oh-my-zsh &>>$log
+
+    export SHELL=/bin/zsh && zsh ./tools/install.sh 0>&- 1>$log 2>$log || die "Failed to install zsh"
+}
+[ -f ~/.zshrc ] && info_ "oh-my-zsh seems to be installed already" || install_oh_my_zsh
+
+install_asdf() {
+    info_ "Installing asdf"
+    git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.4.0 &>>$log \
+	|| die "Failed to install asdf"
+    echo -e '\n. $HOME/.asdf/asdf.sh' | tee ~/.bashrc | tee ~/.zshrc
+    echo -e '\n. $HOME/.asdf/completions/asdf.bash' | tee ~/.bashrc | tee ~/.zshrc
+    . ~/.bashrc
+}
+[ -d ~/.asdf ] && info_ "asdf seems to be installed already" || install_asdf
+
+install_ruby() {
+   info_ "Installing ruby"
+   asdf plugin-add ruby &>>$log
+   version="$(asdf list-all ruby | grep ^[0-9.]*$ | tail -n1)"
+   asdf install ruby "$version" &>>$log || die "Failed to install ruby"
+   asdf global ruby "$version"
+   . ~/.bashrc
+}
+if [[ "$(asdf plugin-list ruby)" == "ruby" ]] || asdf current ruby &>>$log; then
+    info_ "ruby seems to be installed already"
+else
+    install_ruby
+fi
+    
+# Install ruby packages
+gemfile="$(dirname $0)/gems"
+install_ruby_gems() {
+    info_ "Installing ruby gems"
+    cat "$gemfile"  | while read x; do
+	gem list | grep "$x" >/dev/null && info_ "$x seems to be installed ready" && continue
+	info_ "Installing ruby gem $x"
+	gem install "$x" &>>$log || die "Failed to install gem $x"
+    done
+}
+[[ "$(cat $gemfile | wc -l)" == "0" ]] && info_ "There seem to be no ruby gems to install" || install_ruby_gems
+
+zsh
