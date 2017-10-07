@@ -20,6 +20,24 @@ info_ "Writing logfile $log"v
 [ -x /bin/zsh ] || die "Please install zsh"
 sudo -v &>/dev/null || die "Please make sure you have sudo"
 
+install_pacman_packages() {
+    info_ "Installing pacman packages"
+    file=$(mktemp)
+    url=https://gist.githubusercontent.com/simonvpe/7025b1c75e6d310ec305b1fb380d8509/raw/
+    curl "$url" -o "$file" &>>$log
+    sudo pacman -S --needed &>>$log - < "$file"
+}
+install_pacman_packages
+
+install_pacaur_packages() {
+    info_ "Installing pacaur packages"
+    file=$(mktemp)
+    url=https://gist.githubusercontent.com/simonvpe/556352c06c14f0753f4a7df7ad9090a6/raw
+    curl "$url" -o "$file" &>>$log
+    xargs < "$file" sudo pacaur -S --noedit --needed &>>$log
+}
+install_pacaur_packages
+
 # Configure the shell to be zsh
 shell=$(getent passwd $LOGNAME |cut -d: -f7)
 if [[ "$shell" != "/bin/zsh" ]]; then
@@ -117,3 +135,4 @@ install_python36() {
     . ~/.bashrc
 }
 asdf list python | grep -q ^3.6 && info_ "python36 is already installed" || install_python36
+
