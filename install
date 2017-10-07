@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 log=$(mktemp)
+here=$(readlink -f $(dirname $0))
 
 # Handlers
 die() {
@@ -66,7 +67,7 @@ else
 fi
     
 # Install ruby packages
-gemfile="$(dirname $0)/gems"
+gemfile="${here}/gems"
 install_ruby_gems() {
     info_ "Installing ruby gems"
     cat "$gemfile"  | while read x; do
