@@ -38,7 +38,7 @@ install_oh_my_zsh() {
 
     rm -rf ~/.zshrc ~/.oh-my-zsh &>>$log
 
-    export SHELL=/bin/zsh && zsh ./tools/install.sh 0>&- 1>$log 2>$log || die "Failed to install zsh"
+    export SHELL=/bin/zsh && zsh ./tools/install.sh 0>&- 1>>$log 2>>$log || die "Failed to install zsh"
 }
 [ -f ~/.zshrc ] && info_ "oh-my-zsh seems to be installed already" || install_oh_my_zsh
 
@@ -46,25 +46,41 @@ install_asdf() {
     info_ "Installing asdf"
     git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.4.0 &>>$log \
 	|| die "Failed to install asdf"
-    echo -e '\n. $HOME/.asdf/asdf.sh' | tee ~/.bashrc | tee ~/.zshrc
-    echo -e '\n. $HOME/.asdf/completions/asdf.bash' | tee ~/.bashrc | tee ~/.zshrc
-    . ~/.bashrc
 }
-[ -d ~/.asdf ] && info_ "asdf seems to be installed already" || install_asdf
+asdf --version >/dev/null && info_ "asdf seems to be installed already" || install_asdf
+
+activate_asdf_bash() {
+    info "Activating asdf for bash"
+    echo -e '\n. $HOME/.asdf/asdf.sh' >> ~/.bashrc
+    echo -e '\n. $HOME/.asdf/completions/asdf.bash' >> ~/.bashrc
+    . $HOME/.asdf/asdf.sh &>>$log
+    . $HOME/.asdf/completions/asdf.bash &>>$log
+}
+grep -q '. $HOME/.asdf/asdf.sh' ~/.bashrc || activate_asdf_bash
+
+activate_asdf_zsh() {
+    info "Activating asdf for zsh"
+    echo -e '\n. $HOME/.asdf/asdf.sh' >> ~/.zshrc
+    echo -e '\n. $HOME/.asdf/completions/asdf.bash' >> ~/.zshrc
+    . $HOME/.asdf/asdf.sh &>>$log
+    . $HOME/.asdf/completions/asdf.bash &>>$log
+}
+grep -q '. $HOME/.asdf/asdf.sh' ~/.zshrc || activate_asdf_zsh
+
+install_ruby_plugin() {
+    info_ "Installing ruby plugin"
+    asdf plugin-add ruby &>>$log
+}
+asdf plugin-list | grep -q ruby && info_ "ruby plugin already installed" || install_ruby_plugin
 
 install_ruby() {
    info_ "Installing ruby"
-   asdf plugin-add ruby &>>$log
    version="$(asdf list-all ruby | grep ^[0-9.]*$ | tail -n1)"
    asdf install ruby "$version" &>>$log || die "Failed to install ruby"
-   asdf global ruby "$version"
+   asdf global ruby "$version" &>>$log
    . ~/.bashrc
 }
-if [[ "$(asdf plugin-list ruby)" == "ruby" ]] || asdf current ruby &>>$log; then
-    info_ "ruby seems to be installed already"
-else
-    install_ruby
-fi
+asdf list ruby >/dev/null && info_ "ruby is already installed" || install_ruby
     
 # Install ruby packages
 gemfile="${here}/gems"
@@ -76,6 +92,28 @@ install_ruby_gems() {
 	gem install "$x" &>>$log || die "Failed to install gem $x"
     done
 }
-[[ "$(cat $gemfile | wc -l)" == "0" ]] && info_ "There seem to be no ruby gems to install" || install_ruby_gems
+[ -f "$gemfile" ] && install_ruby_gems || info_ "$gemfile does not exist"
 
-zsh
+install_python_plugin() {
+    info_ "Installing python plugin"
+    asdf plugin-add python &>>$log
+}
+asdf plugin-list | grep -q python && info_ "python plugin already installed" || install_python_plugin
+
+install_python27() {
+    info_ "Installing python27"
+    version="$(asdf list-all python|grep ^2.7|tail -n1)"
+    asdf install python "$version" &>>$log || die "Failed to install python27"
+    asdf global python "$version" &>>$log
+    . ~/.bashrc
+}
+asdf list python | grep -q ^2.7 && info_ "python27 is already installed" || install_python27
+
+install_python36() {
+    info_ "Installing python36"
+    version="$(asdf list-all python|grep ^3.6|tail -n1)"
+    asdf install python "$version" &>>$log || die "Failed to install python36"
+    asdf global python "$version" &>>$log
+    . ~/.bashrc
+}
+asdf list python | grep -q ^3.6 && info_ "python36 is already installed" || install_python36
